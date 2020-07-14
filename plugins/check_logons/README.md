@@ -1,127 +1,12 @@
-This is a set of simple nagios plugins written in perl, python, shell-script & powershell
-for testing that for example [Atomia Hosting Control Panel](http://www.atomia.com/) logins
-work.
+## check_logons
 
-# Usage
-
-## check_hcp_login.pl:
-
-```sh
-./check_hcp_login.pl --uri https://some.uri.of.hcp/ --user somelowprivuser --pass 'somepass' --timeout 5 --match somestring-only-found-after-successfull-login
-```
-
-## check_stats_report.sh
-
-Place the following in nrpe.conf on the awstats host:
-```sh
-command[check_stats_lin]=/home/atomia/nagios/check_stats_report.sh some.linux.site 50 3
-command[check_stats_win]=/home/atomia/nagios/check_stats_report.sh some.windows.site 50 3
-```
-
-## check_login.py
-
-```sh
-python3 check_login.py --url <login_form_url> --username <username> --password <password> [--timeout 5] [--match <matchstring>]
-python check_login.py --url <login_form_url> --username <username> --password <password> [--timeout 5] [--match <matchstring>]
-```
-
-Dependencies:
-
-* **WWW::Mechanize** (on ubuntu, just `apt-get install libwww-mechanize-perl`)
-* **BeautifulSoup4** (ubuntu: `apt-get install python-bs4 python3-bs4`)
-
-## check_admins.ps1
-This script checks users on the Windows server. Users can be either local or domain based. The script will compare the list of accounts provided and if there are more users on the system than on the list the script will output CRITICAL.
-
-### Parameters
-```
-check_admins.ps1
-    -domain    "Domain group name"
-    -local     "Local group name"
-    -usernames "COMPUTER\User1,DOMAIN\User2"
-```
-
-### Exit codes
-```
-    0 - OK
-    2 - CRITICAL
-    3 - UNKNOWN
-```
-### Examples
-Example call when all users are there, and there are no additional in group **Domain Admins**:
-```
-./check_admins.ps1 -domain "Domain Admins" -usernames "ATOMIA\Administrator,ATOMIA\apppooluser,ATOMIA\WindowsAdmin"
-```
-Returns:
-```
-OK - No additional users found
-```
-Example call when there is for example additional user that is not in the list:
-Example call when all users are there, and there are no additional in group **Domain Admins**:
-```
-./check_admins.ps1 -domain "Domain Admins" -usernames "ATOMIA\Administrator,ATOMIA\WindowsAdmin"
-```
-Returns:
-```
-CRITICAL - 1 additional users
-ATOMIA\apppooluser
-```
-As we can see here in the list above we did not specify the **apppooluser** which has now been shown.
-
-### Nagios client setup
-Assuming you are using NSClient++ on Windows, the check script needs to be put into: `C:\Program Files\NSClient++\scripts`.
-
-#### nsclient.ini
-Configuration should be as following:
-```
-[/settings/NRPE/server]
-
-...
-
-allow arguments = true
-allow nasty characters = true
-
-[/settings/external scripts]
-allow arguments = true
-allow nasty characters = true
-
-[/settings/external scripts/scripts]
-check_domain_admins = cmd /c echo scripts\check_admins.ps1 -domain "Domain Admins" -usernames $ARG1$; exit($lastexitcode) | powershell.exe -command -
-check_enterprise_admins = cmd /c echo scripts\check_admins.ps1 -domain "Enterprise Admins" -usernames $ARG1$; exit($lastexitcode) | powershell.exe -command -
-check_local_admins = cmd /c echo scripts\check_admins.ps1 -local "Administrators" -usernames $ARG1$; exit($lastexitcode) | powershell.exe -command -
-```
-
-Here we define three most common commands for checking **Domain Admins and Enterprise Admins** domain groups and **Administrators** local group.
-
-### Nagios server setup
-
-Since the script is a shell script that is triggered with `check_nrpe` example call for domain admins would be:
-```
-/usr/local/nagios/libexec/check_nrpe -H 192.168.33.20 -t 30 -c check_domain_admins -a "ATOMIA\Administrator,ATOMIA\WindowsAdmin"
-```
-This would call **check_domain_admins** command in the client which then accepts parameters as on the script.
-
-The command in Nagios would be setup like this:
-
-Command: `$USER1$/check_nrpe -H $HOSTADDRESS$ -t 30 -c $ARG1$ -a $ARG2$`
-
-$ARG1$: `check_domain_admins`
-
-$ARG2$: `'"ATOMIA\Administrator","ATOMIA\WindowsAdmin"'`
-
-or
-
-$ARG2$: `'"ATOMIA\Administrator,ATOMIA\WindowsAdmin"'`
-
-> **Important:** Use double quotes `'"` - wrap whole argument in `'` quotes
+|                 |                                 |
+| --------------- | ------------------------------- |
+| Language        | PowerShell                      |
+| Source          | Atomia custom                   |
+| Original author | nikola.vitanovic@atomia.com     |
 
 
-> **Important:** 
-> Use `check_nrpe_1arg` instead `check_nrpe` as _Check command_ in Nagios UI interface.
->
-> `check_nrpe_1arg` passes `$ARG2$` argument via `-a` as required, where `check_nrpe` passes `$ARG2$` via `-c` and it is not properly substituted. Powershell script will get `$` as parameter value instead value in `$ARG2$`
-
-## check_logons.ps1
 Nagios plugin that alerts if there are 4624 EventIDs aka logins in the Security event log of the system.
 
 In case there are unknown users CRITICAL message will be shown and exit code will be 2. Additional users with computer name or NetBIOS domain will be shown in the new lines after the CRITICAL message. In case there are unknown source IPs they will also be logged as CRITICAL.
@@ -129,6 +14,14 @@ In case there are unknown users CRITICAL message will be shown and exit code wil
 The plugin logs a timestamp of last processed log in the TEMP folder. This timestamp is used to process only logs after the timestamp. Last processed log timestamp will be stored and all logs from that time forward will be processed.
 
 You will get CRITICAL every next time the check occurs, after the first CRITICAL was encountered. Path to the file that should be deleted is shown in the CRITICAL Nagios message.
+
+
+## Requirements
+
+- Administrator privileges
+
+
+## Usage
 
 The script can be run in two ways via Nagios:
 1. Normally with all options via NSClient++ configuration.
@@ -145,6 +38,7 @@ check_logons.ps1
     -debug
     -id
 ```
+
 All parameters are optional. Ignore parameters are essentially whitelists that say that the users or ips in the list are ignored and entries that contain them are ok. They will not result in critical if the ignore value is matched.
 
 #### logonTypes
@@ -235,6 +129,7 @@ There is no need to specify any other options other than `-id` if you are runnin
 #### logLocation
 If you specify `-logLocation` script will create and check the lock files in that location. You should specify absolute path. By default it's the temp location available from the environment variable.
 
+
 ### Exit codes
 ```
     0 - OK
@@ -242,39 +137,7 @@ If you specify `-logLocation` script will create and check the lock files in tha
     3 - UNKNOWN
 ```
 
-### Examples
-Example call that will incorporate all options and no weird settings.
-```
-./check_logons.ps1 -logonTypes 10 -ignoreIPs '127.0.0.1','192.168.33.10','192.168.33.22' -ignoreUsers 'VAGRANT\WINMASTER$'
-```
-Response:
-```
-OK - Processed 3883 logs
-```
-This means that everything was OK and no suspicious activity was detected.
-
-If you specified the `-checkOnly` option and are running the actual check in the task scheduler then if everything was ok you would get the following response:
-```
-OK - No suspicious activity in  the last scan
-```
-
-Next example shows how the script works in User mode only and shows how unknown user `vitanovic` has logged into the server. In case that the `Administrator` has logged no alert would have happened.
-
-Call:
-```
-./check_logons.ps1 -logonTypes 10 -disableIPCheck -ignoreUsers 'VAGRANT\WINMASTER$','VAGRANT\Administrator'
-```
-
-Response:
-```
-CRITICAL - There are 2 unauthorised logins
-Suspicious user - User: VAGRANT\vitanovic IP: 192.168.33.1 EventIndex: 148446 LogonType: 10
-Suspicious user - User: VAGRANT\vitanovic IP: 192.168.33.1 EventIndex: 148445 LogonType: 10
-```
-Example call where you just check for the existance of lock file. This is useful when you are running the script as Nagios check. This example assumes that you already run the script like above with parameters that you want and only check for the existance of the lock file.
-```
-./check_logons.ps1 -id SOME_ID -checkOnly
-```
+## Setup
 ### Task scheduler setup
 In order for the script not to timeout, it's needed to set it up as a Scheduled task in Windows. You would need to set this up on each and every server that you want to run the script.
 Let's say that we want to run the script with the following arguments:
@@ -341,3 +204,37 @@ Command: `$USER1$/check_nrpe -H $HOSTADDRESS$ -t 30 -c $ARG1$ -a $ARG2$ $ARG3$ $
 $ARG1$: `check_logons`
 
 $ARG2$: `SOME_ID`
+
+## Examples
+Example call that will incorporate all options and no weird settings.
+```
+./check_logons.ps1 -logonTypes 10 -ignoreIPs '127.0.0.1','192.168.33.10','192.168.33.22' -ignoreUsers 'VAGRANT\WINMASTER$'
+```
+Response:
+```
+OK - Processed 3883 logs
+```
+This means that everything was OK and no suspicious activity was detected.
+
+If you specified the `-checkOnly` option and are running the actual check in the task scheduler then if everything was ok you would get the following response:
+```
+OK - No suspicious activity in  the last scan
+```
+
+Next example shows how the script works in User mode only and shows how unknown user `vitanovic` has logged into the server. In case that the `Administrator` has logged no alert would have happened.
+
+Call:
+```
+./check_logons.ps1 -logonTypes 10 -disableIPCheck -ignoreUsers 'VAGRANT\WINMASTER$','VAGRANT\Administrator'
+```
+
+Response:
+```
+CRITICAL - There are 2 unauthorised logins
+Suspicious user - User: VAGRANT\vitanovic IP: 192.168.33.1 EventIndex: 148446 LogonType: 10
+Suspicious user - User: VAGRANT\vitanovic IP: 192.168.33.1 EventIndex: 148445 LogonType: 10
+```
+Example call where you just check for the existance of lock file. This is useful when you are running the script as Nagios check. This example assumes that you already run the script like above with parameters that you want and only check for the existance of the lock file.
+```
+./check_logons.ps1 -id SOME_ID -checkOnly
+```
